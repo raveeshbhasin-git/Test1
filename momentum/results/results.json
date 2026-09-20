@@ -1,0 +1,109 @@
+{
+  "meta": {
+    "asof": "2026-09-18",
+    "universe": "S&P 500 + S&P 400 (903 tickers, $3+ price, $5M+ avg daily dollar volume)",
+    "history": "2015-01-02 to 2026-09-18 (2,945 trading days)",
+    "episode_definition": "gain of >= 80% within 63 trading days (~3 months); episodes < 6 months apart merged",
+    "episode_counts": { "total": 628, "breakout": 327, "rebound": 301 }
+  },
+  "backtest": {
+    "note": "Forward stats measured over next 63 trading days from every qualifying ticker-day, 2016-2026. p_max40 = probability the stock trades >= +40% above entry at some point within 63 days. p_dd20 = probability it trades <= -20% below entry within 63 days.",
+    "signals": {
+      "S1_hi_vol_rs":   { "label": "New 52w high + volume >1.3x + RS>+10% + golden cross", "n": 34297,  "mean63": 0.066,  "med63": 0.0363, "p_max20": 0.2929, "p_max40": 0.1034, "p_max80": 0.0241, "p_dd20": 0.1707 },
+      "S2_vol_shock":   { "label": "Volume 2x average + 21d return >10%",                  "n": 2681,   "mean63": 0.0885, "med63": 0.0175, "p_max20": 0.3786, "p_max40": 0.2134, "p_max80": 0.0817, "p_dd20": 0.2906 },
+      "S3_tight_break": { "label": "Tight quiet base + new 52w high + golden cross",       "n": 447403, "mean63": 0.0325, "med63": 0.0287, "p_max20": 0.1551, "p_max40": 0.0288, "p_max80": 0.0035, "p_dd20": 0.0972 },
+      "S4_dip_uptrend": { "label": "RSI<35 dip, 10-25% off high, in strong uptrend",       "n": 11021,  "mean63": 0.0504, "med63": 0.0392, "p_max20": 0.2734, "p_max40": 0.0495, "p_max80": 0.0024, "p_dd20": 0.1314 },
+      "S5_ignition":    { "label": "IGNITION: +12% in 5 days on 1.5x volume, uptrend",     "n": 2271,   "mean63": 0.1702, "med63": 0.1045, "p_max20": 0.535,  "p_max40": 0.269,  "p_max80": 0.0815, "p_dd20": 0.2272 },
+      "baseline":       { "label": "Any liquid ticker-day (baseline)",                     "n": 2178204,"mean63": 0.0447, "med63": 0.0365, "p_max20": 0.2154, "p_max40": 0.0462, "p_max80": 0.0063, "p_dd20": 0.1172 }
+    },
+    "ignition_per_year": {
+      "2016": { "n": 137, "sig_mean63": 0.131, "base_mean63": 0.072, "sig_pmax40": 0.168, "base_pmax40": 0.027 },
+      "2017": { "n": 129, "sig_mean63": 0.023, "base_mean63": 0.051, "sig_pmax40": 0.047, "base_pmax40": 0.013 },
+      "2018": { "n": 107, "sig_mean63": 0.205, "base_mean63": 0.013, "sig_pmax40": 0.327, "base_pmax40": 0.017 },
+      "2019": { "n": 68,  "sig_mean63": 0.105, "base_mean63": 0.027, "sig_pmax40": 0.118, "base_pmax40": 0.019 },
+      "2020": { "n": 858, "sig_mean63": 0.257, "base_mean63": 0.107, "sig_pmax40": 0.333, "base_pmax40": 0.147 },
+      "2021": { "n": 191, "sig_mean63": 0.100, "base_mean63": 0.041, "sig_pmax40": 0.183, "base_pmax40": 0.032 },
+      "2022": { "n": 128, "sig_mean63": 0.005, "base_mean63": 0.005, "sig_pmax40": 0.109, "base_pmax40": 0.036 },
+      "2023": { "n": 134, "sig_mean63": 0.098, "base_mean63": 0.050, "sig_pmax40": 0.209, "base_pmax40": 0.042 },
+      "2024": { "n": 206, "sig_mean63": 0.067, "base_mean63": 0.040, "sig_pmax40": 0.301, "base_pmax40": 0.036 },
+      "2025": { "n": 196, "sig_mean63": 0.311, "base_mean63": 0.047, "sig_pmax40": 0.403, "base_pmax40": 0.066 },
+      "2026": { "n": 147, "sig_mean63": 0.074, "base_mean63": 0.057, "sig_pmax40": 0.241, "base_pmax40": 0.065 }
+    },
+    "episode_start_profile": {
+      "note": "Median feature values on the day before an episode's optimal entry vs random control days. The optimal entry is usually a LOCAL LOW - it looks weak, not strong. You cannot time the exact bottom; you can catch the ignition that follows.",
+      "breakout_median": { "r21": -0.124, "r63": -0.105, "pct_from_hi": -0.291, "rsi14": 38.1, "volr": 1.076, "above_ma50": 0, "golden": 1 },
+      "control_median":  { "r21": 0.014,  "r63": 0.043,  "pct_from_hi": -0.094, "rsi14": 53.3, "volr": 0.963, "above_ma50": 1, "golden": 1 }
+    }
+  },
+  "famous_episodes": [
+    { "ticker": "DELL", "start": "2023-12-04", "gain": 0.805, "days": 60, "note": "AI-server order book inflection; +80% in 3 months after years range-bound" },
+    { "ticker": "DELL", "start": "2026-01-20", "gain": 0.918, "days": 63, "note": "Second AI-infrastructure leg; ~3x from 2025 base" },
+    { "ticker": "MU",   "start": "2025-04-04", "gain": 0.976, "days": 54, "note": "HBM/AI memory supercycle ignition at ~$64; ran toward ~$900 by Aug 2026 (~7x+)" },
+    { "ticker": "AMD",  "start": "2026-02-04", "gain": 1.105, "days": 63, "note": "AI accelerator share gains" },
+    { "ticker": "PLTR", "start": "2020-09-30", "gain": 2.058, "days": 40, "note": "Post-IPO ignition: +206% in 2 months" },
+    { "ticker": "PLTR", "start": "2024-08-02", "gain": 0.818, "days": 60, "note": "AIP-driven re-rating within long uptrend" },
+    { "ticker": "SMCI", "start": "2023-02-21", "gain": 0.872, "days": 63, "note": "AI server ramp; repeated 80%+ bursts 2022-2026" },
+    { "ticker": "VST",  "start": "2023-12-19", "gain": 0.819, "days": 63, "note": "Power/AI-datacenter re-rating" },
+    { "ticker": "GEV",  "start": "2024-07-30", "gain": 0.825, "days": 61, "note": "Grid/turbine demand post-spin" },
+    { "ticker": "CEG",  "start": "2025-04-04", "gain": 0.891, "days": 58, "note": "Nuclear-power AI demand" },
+    { "ticker": "MRNA", "start": "2020-01-03", "gain": 0.844, "days": 63, "note": "COVID vaccine platform ignition" },
+    { "ticker": "TSLA", "start": "2019-09-24", "gain": 0.878, "days": 63, "note": "Profitability surprise ignition into 10x run" }
+  ],
+  "top_breakout_episodes": [
+    { "ticker": "PLTR", "start": "2020-09-30", "gain": 2.058, "prior1y": null },
+    { "ticker": "ECHO", "start": "2025-05-27", "gain": 1.513, "prior1y": 0.109 },
+    { "ticker": "SITM", "start": "2019-11-20", "gain": 1.427, "prior1y": null },
+    { "ticker": "ROKU", "start": "2017-09-28", "gain": 1.408, "prior1y": null },
+    { "ticker": "KBH",  "start": "2020-03-16", "gain": 1.301, "prior1y": -0.306 },
+    { "ticker": "WFRD", "start": "2021-01-04", "gain": 1.291, "prior1y": null },
+    { "ticker": "FLEX", "start": "2026-02-04", "gain": 1.290, "prior1y": 0.453 },
+    { "ticker": "VICR", "start": "2023-04-25", "gain": 1.261, "prior1y": -0.310 },
+    { "ticker": "TWLO", "start": "2016-06-23", "gain": 1.255, "prior1y": null },
+    { "ticker": "THO",  "start": "2020-03-09", "gain": 1.188, "prior1y": -0.173 },
+    { "ticker": "AVAV", "start": "2025-03-26", "gain": 1.162, "prior1y": -0.154 },
+    { "ticker": "AMD",  "start": "2026-02-04", "gain": 1.105, "prior1y": 0.752 },
+    { "ticker": "AXON", "start": "2018-02-07", "gain": 1.105, "prior1y": -0.032 },
+    { "ticker": "STRL", "start": "2026-02-03", "gain": 1.084, "prior1y": 1.716 },
+    { "ticker": "BROS", "start": "2021-09-15", "gain": 1.079, "prior1y": null },
+    { "ticker": "GME",  "start": "2024-02-12", "gain": 1.067, "prior1y": -0.251 },
+    { "ticker": "LNTH", "start": "2024-04-10", "gain": 1.065, "prior1y": -0.300 },
+    { "ticker": "ATI",  "start": "2025-04-04", "gain": 1.043, "prior1y": -0.153 }
+  ],
+  "watchlist": {
+    "ignition_fires": [
+      { "ticker": "ILMN", "name": "Illumina", "sector": "Healthcare / Genomics", "fired": "2026-09-18", "price": 239.62, "r5_at_fire": 0.161, "volr": 1.73, "r63": 0.48, "r252": 1.38, "rs63": 0.47, "pct_from_hi": -0.023,
+        "why": "Fresh ignition (Sep 18): +16% week on 1.7x volume at a new 52-week high. Joins the S&P 500 on Sep 21 (forced index buying). Core sequencing growth re-accelerating; +82% in 6 months with analyst targets still trailing price." },
+      { "ticker": "MRNA", "name": "Moderna", "sector": "Healthcare / Biotech", "fired": "2026-09-17", "price": 154.04, "r5_at_fire": 0.157, "volr": 2.98, "r63": 1.41, "r252": 5.16, "rs63": 1.40, "pct_from_hi": -0.117,
+        "why": "Re-ignition (Sep 17) on 3x volume after August's +156% month on positive intismeran (melanoma cancer-vaccine) trial data. Highest-octane name here: +439% YTD but analysts split (one Sell at $81 target vs Wolfe upgrade). Classic post-catalyst continuation setup with violent drawdown risk." },
+      { "ticker": "CNH",  "name": "CNH Industrial", "sector": "Industrials / Farm Equipment", "fired": "2026-09-08", "price": 13.45, "r5_at_fire": 0.150, "volr": 1.52, "r63": 0.29, "r252": 0.25, "rs63": 0.28, "pct_from_hi": -0.066,
+        "why": "Ignition (Sep 8): Evercore + Baird upgrades on a 2027 farm-cycle recovery; post-earnings +23% week. Cheap cyclical turning up from a multi-year base with dealer inventories normalizing - early-cycle profile similar to Dell Dec-2023." }
+    ],
+    "leaders": [
+      { "ticker": "ANF",  "name": "Abercrombie & Fitch", "sector": "Consumer / Apparel", "price": 135.76, "r63": 0.556, "rs63": 0.55, "volr": 1.73, "pct_from_hi": -0.107,
+        "why": "Aug 26 earnings ignition: +35% day (EPS $4.17 vs $2.32 prior year, raised guidance, $100M tariff refund). Still 11% below high after digesting - backtest says continuation odds stay elevated for ~3 months post-ignition." },
+      { "ticker": "SWKS", "name": "Skyworks Solutions", "sector": "Tech / Semiconductors", "price": 88.76, "r63": 0.225, "rs63": 0.22, "volr": 1.48, "pct_from_hi": -0.028,
+        "why": "+24% five-day rally as the $22B Qorvo merger enters final regulatory phase (year-end close). 36% short interest = squeeze fuel. Sits just under the ignition volume threshold - a close above with volume confirms." },
+      { "ticker": "VLO",  "name": "Valero Energy", "sector": "Energy / Refining", "price": 413.28, "r63": 0.756, "rs63": 0.75, "volr": 0.97, "pct_from_hi": 0.0,
+        "why": "Refining supercycle: record crack spreads from a global fuel squeeze. VLO/MPC/PSX/DINO all doubled YTD and sit at 52-week highs with RSI ~80 - extended; the play is dips, not chases. Group RS is the strongest in the universe." },
+      { "ticker": "MPC",  "name": "Marathon Petroleum", "sector": "Energy / Refining", "price": 424.89, "r63": 0.754, "rs63": 0.75, "volr": 1.15, "pct_from_hi": 0.0,
+        "why": "+151% YTD on tight fuel markets; same refining-margin thesis as VLO. At highs on rising volume." },
+      { "ticker": "RVTY", "name": "Revvity", "sector": "Healthcare / Life-science tools", "price": 143.45, "r63": 0.435, "rs63": 0.43, "volr": 1.37, "pct_from_hi": -0.022,
+        "why": "Life-science tools group move (ILMN, TMO, A, CRL, AVTR, BIO all score >= 4): sector rotation into a beaten-down group, volume confirming. Group breadth = durable theme signal." },
+      { "ticker": "ROIV", "name": "Roivant Sciences", "sector": "Healthcare / Biotech", "price": 39.77, "r63": 0.265, "rs63": 0.26, "volr": 1.56, "pct_from_hi": -0.049,
+        "why": "+160% over 12 months, elevated volume, near highs - biotech capital-rotation beneficiary alongside MRNA." }
+    ]
+  },
+  "playbook": {
+    "signal": "IGNITION = 5-day return > +12% AND 21-day avg volume > 1.5x its 126-day average AND 50dma > 200dma (price $3+, dollar volume $5M+).",
+    "stats": "27% of ignitions saw another +40% within 63 trading days (5.8x the 4.6% baseline); 8.2% saw +80% (13x baseline). Mean 63-day forward return +17% vs +4.5% baseline. Positive edge in 10 of 11 years.",
+    "risk": "23% of ignitions dipped -20% below entry within the window (vs 12% baseline). Position sizing and staggered entries matter more than precision.",
+    "checklist": [
+      "Did the stock jump >= 12% in a week on >= 1.5x normal volume?",
+      "Is the 50-day MA above the 200-day MA (established uptrend or early turn)?",
+      "Is there a real catalyst - earnings inflection, new product cycle, index inclusion, M&A, sector supercycle?",
+      "Is relative strength vs the market positive and rising?",
+      "Are peers moving too (group confirmation)?",
+      "Enter in tranches; expect a -20% shakeout 1-in-4 times; give it up to 3 months."
+    ]
+  }
+}
