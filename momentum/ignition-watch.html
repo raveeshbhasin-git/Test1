@@ -1,0 +1,326 @@
+<title>Ignition Watch</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Spectral:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+:root{
+  --paper:#FAF9F6; --card:#FFFFFF; --ink:#1A2230; --muted:#5A6472; --faint:#8B93A0;
+  --line:#E5E2D9; --accent:#E8501A; --accent-soft:#FBEAE2; --blue:#3D6ECC; --blue-soft:#E8EEFA;
+  --good:#1E7A46; --bad:#B3261E; --chip:#F1EFE9; --code:#F4F2EC;
+  --shadow:0 1px 3px rgba(26,34,48,.07),0 8px 24px rgba(26,34,48,.05);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --paper:#171D26; --card:#1F2733; --ink:#ECEDE8; --muted:#A8AFB9; --faint:#7A828E;
+    --line:#313A47; --accent:#EE5F26; --accent-soft:#3A2418; --blue:#5E8FE0; --blue-soft:#1F2C42;
+    --good:#5BBE85; --bad:#E58B85; --chip:#28303C; --code:#232B37;
+    --shadow:0 1px 3px rgba(0,0,0,.3),0 8px 24px rgba(0,0,0,.25);
+  }
+}
+:root[data-theme="dark"]{
+  --paper:#171D26; --card:#1F2733; --ink:#ECEDE8; --muted:#A8AFB9; --faint:#7A828E;
+  --line:#313A47; --accent:#EE5F26; --accent-soft:#3A2418; --blue:#5E8FE0; --blue-soft:#1F2C42;
+  --good:#5BBE85; --bad:#E58B85; --chip:#28303C; --code:#232B37;
+  --shadow:0 1px 3px rgba(0,0,0,.3),0 8px 24px rgba(0,0,0,.25);
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--paper);color:var(--ink);font:16px/1.6 "IBM Plex Sans",system-ui,sans-serif;padding-inline:16px}
+.wrap{max-width:900px;margin:0 auto;padding-block:40px 80px}
+.eyebrow{font:600 12px/1.4 "IBM Plex Mono",monospace;letter-spacing:.14em;text-transform:uppercase;color:var(--accent)}
+h1{font:600 clamp(34px,6vw,52px)/1.12 Spectral,Georgia,serif;margin:10px 0 14px;text-wrap:balance}
+h2{font:600 clamp(24px,3.5vw,30px)/1.25 Spectral,Georgia,serif;margin:0 0 6px;text-wrap:balance}
+h3{font:600 18px/1.35 "IBM Plex Sans",system-ui,sans-serif;margin:0 0 6px}
+.standfirst{font-size:18.5px;color:var(--muted);max-width:64ch;margin:0}
+section{margin-top:64px}
+.kicker{font:600 12px/1.4 "IBM Plex Mono",monospace;letter-spacing:.12em;text-transform:uppercase;color:var(--faint);margin-bottom:8px}
+.lede{color:var(--muted);max-width:68ch;margin:6px 0 0}
+a{color:var(--blue);text-decoration-thickness:1px;text-underline-offset:2px}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-top:28px}
+.tile{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:16px 18px;box-shadow:var(--shadow)}
+.tile .n{font:600 30px/1.1 "IBM Plex Mono",monospace;font-variant-numeric:tabular-nums}
+.tile .n em{font-style:normal;color:var(--accent)}
+.tile .l{font-size:12.5px;color:var(--muted);margin-top:6px;line-height:1.45}
+table{border-collapse:collapse;width:100%;font-variant-numeric:tabular-nums}
+.tablewrap{overflow-x:auto;margin-top:18px;border:1px solid var(--line);border-radius:10px;background:var(--card);box-shadow:var(--shadow)}
+th{font:600 11.5px/1.3 "IBM Plex Mono",monospace;letter-spacing:.08em;text-transform:uppercase;color:var(--faint);text-align:left;padding:12px 14px;border-bottom:1px solid var(--line);white-space:nowrap}
+td{padding:11px 14px;border-bottom:1px solid var(--line);vertical-align:top;font-size:14.5px}
+tr:last-child td{border-bottom:0}
+td.num,th.num{text-align:right}
+.tick{font:600 13px/1 "IBM Plex Mono",monospace;background:var(--chip);border-radius:6px;padding:4px 7px;display:inline-block}
+.gain{color:var(--good);font-weight:600}
+.note{color:var(--muted);font-size:13.5px}
+.finding{display:grid;grid-template-columns:56px 1fr;gap:16px;margin-top:26px}
+.finding .no{font:600 26px/1 Spectral,Georgia,serif;color:var(--accent);padding-top:2px}
+.finding p{margin:6px 0 0;color:var(--muted);max-width:62ch}
+.sig{background:var(--accent-soft);border:1px solid var(--accent);border-radius:10px;padding:18px 20px;margin-top:30px}
+.sig .k{font:600 12px/1.4 "IBM Plex Mono",monospace;letter-spacing:.12em;text-transform:uppercase;color:var(--accent)}
+.sig .rule{font:600 19px/1.45 "IBM Plex Sans",system-ui,sans-serif;margin:6px 0 2px}
+.sig p{margin:6px 0 0;color:var(--muted);font-size:14.5px}
+.chartcard{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:20px;margin-top:22px;box-shadow:var(--shadow)}
+.chartcard .cap{font-size:13px;color:var(--muted);margin-top:10px}
+.legend{display:flex;gap:18px;flex-wrap:wrap;font-size:13px;color:var(--muted);margin:2px 0 12px}
+.legend span{display:inline-flex;align-items:center;gap:7px}
+.sw{width:12px;height:12px;border-radius:3px;display:inline-block}
+svg text{font-family:"IBM Plex Sans",system-ui,sans-serif}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px;margin-top:22px}
+.wcard{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:18px;box-shadow:var(--shadow);display:flex;flex-direction:column;gap:10px}
+.wcard.fire{border-top:3px solid var(--accent)}
+.whead{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.whead .tick{background:var(--accent-soft);color:var(--accent)}
+.wname{font-weight:600}
+.wsec{font-size:12px;color:var(--faint)}
+.stats{display:flex;gap:8px;flex-wrap:wrap}
+.stat{font:500 12px/1.2 "IBM Plex Mono",monospace;background:var(--chip);border-radius:6px;padding:5px 8px;color:var(--muted);font-variant-numeric:tabular-nums}
+.stat b{color:var(--ink)}
+.why{font-size:14px;color:var(--muted);margin:0}
+.fired{font:600 11.5px/1 "IBM Plex Mono",monospace;color:var(--accent);letter-spacing:.06em}
+.check{list-style:none;padding:0;margin:18px 0 0;display:grid;gap:10px;max-width:66ch}
+.check li{display:grid;grid-template-columns:26px 1fr;gap:10px;align-items:start}
+.check .bx{width:18px;height:18px;border:2px solid var(--accent);border-radius:5px;margin-top:3px}
+.callout{background:var(--card);border-left:3px solid var(--bad);border-radius:0 10px 10px 0;padding:14px 18px;margin-top:24px;box-shadow:var(--shadow)}
+.callout b{color:var(--bad)}
+code{font:500 13px/1.5 "IBM Plex Mono",monospace;background:var(--code);padding:2px 6px;border-radius:5px}
+pre{background:var(--code);border:1px solid var(--line);border-radius:10px;padding:14px 16px;overflow-x:auto;font:400 13px/1.6 "IBM Plex Mono",monospace;margin:14px 0 0}
+.disclaimer{margin-top:70px;padding-top:20px;border-top:1px solid var(--line);font-size:13px;color:var(--faint);max-width:70ch}
+.tooltip{position:fixed;pointer-events:none;background:var(--ink);color:var(--paper);font:500 12.5px/1.5 "IBM Plex Mono",monospace;padding:7px 10px;border-radius:7px;opacity:0;transition:opacity .12s;z-index:10;max-width:260px;white-space:nowrap}
+.asof{display:inline-flex;align-items:center;gap:8px;font:500 12.5px/1 "IBM Plex Mono",monospace;color:var(--muted);background:var(--chip);border-radius:99px;padding:7px 13px;margin-top:22px}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--good)}
+@media (max-width:520px){ .finding{grid-template-columns:40px 1fr} td{font-size:13.5px} }
+</style>
+
+<div class="wrap">
+
+<header>
+  <div class="eyebrow">Momentum Research · S&amp;P 500 + 400 · 2015–2026</div>
+  <h1>The explosive move announces itself</h1>
+  <p class="standfirst">Dell tripled in months after years of drift. Micron went up ~7× while everyone watched. We mined 11 years of every large- and mid-cap US stock for moves like these — 628 of them — measured what was visible <em>before</em> they ran, and backtested the tells. One pattern holds up. This page explains it and tracks the stocks flashing it right now.</p>
+  <div class="tiles">
+    <div class="tile"><div class="n">628</div><div class="l">episodes of +80% within 63 trading days, across 903 major stocks</div></div>
+    <div class="tile"><div class="n"><em>+17.0%</em></div><div class="l">avg next-3-month return after an ignition signal, vs +4.5% baseline</div></div>
+    <div class="tile"><div class="n"><em>27%</em></div><div class="l">of ignitions gained another +40% within 3 months — 5.8× the base rate</div></div>
+    <div class="tile"><div class="n">10 / 11</div><div class="l">years with a positive edge, including the 2022 bear market</div></div>
+  </div>
+  <div class="asof"><span class="dot"></span>Data through 2026-09-18 · yfinance daily bars · dividend-adjusted</div>
+</header>
+
+<section id="moves">
+  <div class="kicker">01 · The moves we studied</div>
+  <h2>What a Dell-or-Micron event looks like</h2>
+  <p class="lede">An <b>episode</b> is any point where a stock went on to gain ≥80% within 63 trading days (~3 months). About half were crash rebounds (March 2020, late 2022). The other 327 were the interesting kind: <b>breakouts from strength or from a flat base</b> — the archetype you asked about.</p>
+  <div class="tablewrap"><table>
+    <thead><tr><th>Stock</th><th>Ignited</th><th class="num">Burst</th><th class="num">Days</th><th>What was actually happening</th></tr></thead>
+    <tbody>
+      <tr><td><span class="tick">DELL</span></td><td>Dec 2023</td><td class="num gain">+81%</td><td class="num">60</td><td>AI-server order book inflected; first leg of the ~3× run</td></tr>
+      <tr><td><span class="tick">MU</span></td><td>Apr 2025</td><td class="num gain">+98%</td><td class="num">54</td><td>HBM / AI-memory supercycle ignition at ~$64 — ran toward ~$900 by Aug 2026</td></tr>
+      <tr><td><span class="tick">PLTR</span></td><td>Sep 2020</td><td class="num gain">+206%</td><td class="num">40</td><td>Post-IPO ignition; repeated 80%+ bursts again in 2023 and 2024</td></tr>
+      <tr><td><span class="tick">SMCI</span></td><td>Feb 2023</td><td class="num gain">+87%</td><td class="num">63</td><td>AI server ramp — four separate 80%+ bursts 2022–2026</td></tr>
+      <tr><td><span class="tick">VST</span></td><td>Dec 2023</td><td class="num gain">+82%</td><td class="num">63</td><td>Power-for-datacenters re-rating; CEG and GEV followed in 2024–25</td></tr>
+      <tr><td><span class="tick">AMD</span></td><td>Feb 2026</td><td class="num gain">+111%</td><td class="num">63</td><td>AI accelerator share gains</td></tr>
+      <tr><td><span class="tick">TSLA</span></td><td>Sep 2019</td><td class="num gain">+88%</td><td class="num">63</td><td>Profitability surprise — the ignition of the 10× run</td></tr>
+      <tr><td><span class="tick">MRNA</span></td><td>Jan 2020</td><td class="num gain">+84%</td><td class="num">63</td><td>Platform + catalyst; the same stock is running again in 2026</td></tr>
+      <tr><td><span class="tick">ANF</span></td><td>2023–24</td><td class="num gain">+285%/yr</td><td class="num">—</td><td>Brand turnaround; earnings-gap ignitions repeated</td></tr>
+      <tr><td><span class="tick">FLEX</span></td><td>Feb 2026</td><td class="num gain">+129%</td><td class="num">63</td><td>AI infrastructure manufacturing</td></tr>
+    </tbody>
+  </table></div>
+  <p class="note">Full catalog: 628 episodes in <code>momentum/results</code> + regeneration scripts in the repo. Biggest single burst found: PLTR +206% in 40 sessions.</p>
+</section>
+
+<section id="findings">
+  <div class="kicker">02 · What precedes the move</div>
+  <h2>Three findings, one honest caveat</h2>
+
+  <div class="finding"><div class="no">1</div><div>
+    <h3>The perfect entry day looks <em>weak</em> — and is unknowable in real time</h3>
+    <p>On the day before the optimal entry, the median breakout stock sat <b>29% below its 52-week high</b>, below its 50-day average, RSI ≈ 38, with a <i>negative</i> 3-month return. The mathematically best entry is a local low — it only looks obvious in hindsight. Anyone claiming they can time the exact bottom of the base is selling something.</p>
+  </div></div>
+
+  <div class="finding"><div class="no">2</div><div>
+    <h3>The tradeable tell is the ignition — the first violent week</h3>
+    <p>What <i>is</i> catchable: the moment the move breaks cover. A <b>+12% week on ≥1.5× normal volume, inside an intact uptrend</b> (50-day MA above 200-day) marked the start of the discoverable portion of most great runs — Dell's Dec-2023 earnings gap, Micron's Apr-2025 surge, ANF's Aug-2026 report. Explosive moves start explosively. Strength begets strength.</p>
+  </div></div>
+
+  <div class="finding"><div class="no">3</div><div>
+    <h3>Quiet breakouts don't work; catalysts do</h3>
+    <p>The classic "tight base breaking to a new high on low noise" — with no volume shock — performed <b>worse than baseline</b> (2.9% vs 4.6% odds of +40%). Volume is the load-bearing ingredient: it's the footprint of institutions repositioning. And nearly every big episode maps to a nameable catalyst: an earnings inflection, a product/AI cycle, index inclusion, M&amp;A, or a sector supercycle. The chart finds the footprint; the news tells you whether it's real.</p>
+  </div></div>
+
+  <div class="sig">
+    <div class="k">The signal · backtested rule</div>
+    <div class="rule">IGNITION = 5-day return &gt; +12% &nbsp;AND&nbsp; 21-day volume &gt; 1.5× its 126-day average &nbsp;AND&nbsp; 50-DMA &gt; 200-DMA</div>
+    <p>Universe: S&amp;P 500 + S&amp;P 400, price &gt; $3, avg dollar volume &gt; $5M. Evaluated on every qualifying ticker-day 2016–2026 (2.18M observations, 2,271 fires).</p>
+  </div>
+</section>
+
+<section id="backtest">
+  <div class="kicker">03 · The backtest</div>
+  <h2>Five candidate signals vs. the field</h2>
+  <p class="lede">For each signal: the probability that the stock trades at least +40% above the entry at some point in the next 63 sessions. Baseline = any liquid ticker-day.</p>
+
+  <div class="chartcard">
+    <svg id="sigchart" viewBox="0 0 860 330" width="100%" role="img" aria-label="Probability of +40% within 63 days by signal">
+      <!-- grid -->
+      <g stroke="var(--line)" stroke-width="1">
+        <line x1="330" y1="20" x2="330" y2="290"/><line x1="470" y1="20" x2="470" y2="290"/>
+        <line x1="610" y1="20" x2="610" y2="290"/><line x1="750" y1="20" x2="750" y2="290"/>
+      </g>
+      <g fill="var(--faint)" font-size="12">
+        <text x="330" y="308" text-anchor="middle">10%</text><text x="470" y="308" text-anchor="middle">20%</text>
+        <text x="610" y="308" text-anchor="middle">30%</text><text x="750" y="308" text-anchor="middle">40%</text>
+      </g>
+      <!-- bars: x0=190, 14px per % -->
+      <g class="bar" data-tip="Ignition · P(+40%)=26.9% · n=2,271 · mean +17.0%">
+        <rect x="190" y="28" width="376.6" height="30" rx="4" fill="var(--accent)"/>
+        <text x="574" y="48" font-size="14" font-weight="600" fill="var(--ink)">26.9%</text>
+        <text x="182" y="48" text-anchor="end" font-size="13.5" font-weight="600" fill="var(--ink)">Ignition (+12% wk, 1.5× vol)</text>
+      </g>
+      <g class="bar" data-tip="Volume shock · P(+40%)=21.3% · n=2,681 · median only +1.8%">
+        <rect x="190" y="72" width="298.2" height="30" rx="4" fill="var(--blue)"/>
+        <text x="496" y="92" font-size="14" fill="var(--ink)">21.3%</text>
+        <text x="182" y="92" text-anchor="end" font-size="13.5" fill="var(--muted)">Volume shock (2× vol, +10% mo)</text>
+      </g>
+      <g class="bar" data-tip="New high + volume + RS · P(+40%)=10.3% · n=34,297">
+        <rect x="190" y="116" width="144.2" height="30" rx="4" fill="var(--blue)"/>
+        <text x="342" y="136" font-size="14" fill="var(--ink)">10.3%</text>
+        <text x="182" y="136" text-anchor="end" font-size="13.5" fill="var(--muted)">52-wk high + volume + RS</text>
+      </g>
+      <g class="bar" data-tip="Dip in uptrend · P(+40%)=5.0% · n=11,021">
+        <rect x="190" y="160" width="69.3" height="30" rx="4" fill="var(--blue)"/>
+        <text x="267" y="180" font-size="14" fill="var(--ink)">5.0%</text>
+        <text x="182" y="180" text-anchor="end" font-size="13.5" fill="var(--muted)">RSI&lt;35 dip in uptrend</text>
+      </g>
+      <g class="bar" data-tip="Baseline · P(+40%)=4.6% · n=2,178,204">
+        <rect x="190" y="204" width="64.7" height="30" rx="4" fill="var(--faint)"/>
+        <text x="262" y="224" font-size="14" fill="var(--ink)">4.6%</text>
+        <text x="182" y="224" text-anchor="end" font-size="13.5" fill="var(--muted)">Baseline (any day)</text>
+      </g>
+      <g class="bar" data-tip="Quiet tight breakout · P(+40%)=2.9% · n=447,403 — below baseline">
+        <rect x="190" y="248" width="40.3" height="30" rx="4" fill="var(--faint)"/>
+        <text x="238" y="268" font-size="14" fill="var(--ink)">2.9%</text>
+        <text x="182" y="268" text-anchor="end" font-size="13.5" fill="var(--muted)">Quiet breakout (no volume)</text>
+      </g>
+    </svg>
+    <div class="cap">Odds of tacking on another +40% within 63 trading days of the signal, 2016–2026. Hover any bar for sample size. The quiet breakout — the pattern most chart books teach — is the one that <i>under</i>performs.</div>
+  </div>
+
+  <div class="chartcard">
+    <div class="legend">
+      <span><span class="sw" style="background:var(--accent)"></span>Ignition signal</span>
+      <span><span class="sw" style="background:var(--faint)"></span>Baseline, same year</span>
+    </div>
+    <svg id="yearchart" viewBox="0 0 860 260" width="100%" role="img" aria-label="Per-year P(+40%) ignition vs baseline">
+      <g stroke="var(--line)" stroke-width="1">
+        <line x1="50" y1="200" x2="840" y2="200"/><line x1="50" y1="130" x2="840" y2="130" stroke-dasharray="3 4"/><line x1="50" y1="60" x2="840" y2="60" stroke-dasharray="3 4"/>
+      </g>
+      <g fill="var(--faint)" font-size="11.5">
+        <text x="44" y="204" text-anchor="end">0</text><text x="44" y="134" text-anchor="end">20%</text><text x="44" y="64" text-anchor="end">40%</text>
+      </g>
+      <!-- 11 years, group width 72, bar 24, gap 2; x start 58; scale 3.5px/% -->
+      <g id="ybars"></g>
+      <g id="ylabels" fill="var(--muted)" font-size="11.5" text-anchor="middle"></g>
+    </svg>
+    <div class="cap">Yearly hit-rate of +40% within 63 days: signal vs baseline. Edge positive every year except 2017 (few, weak fires). 2025's fires — MU among them — hit 40%.</div>
+  </div>
+
+  <div class="callout"><b>The cost of admission:</b> 23% of ignitions dipped ≥20% below entry within the window (vs 12% baseline). The signal buys volatility, not certainty — sizing and staggered entries matter more than precision. Median outcome +10.5%; the distribution's right tail is where the Dells live.</div>
+</section>
+
+<section id="playbook">
+  <div class="kicker">04 · The playbook</div>
+  <h2>Six checks before acting on a fire</h2>
+  <ul class="check">
+    <li><span class="bx"></span><span><b>The jump:</b> ≥ +12% in 5 sessions on ≥ 1.5× normal volume — the ignition itself.</span></li>
+    <li><span class="bx"></span><span><b>The trend:</b> 50-day MA above 200-day. Ignitions inside downtrends are usually short squeezes that fail.</span></li>
+    <li><span class="bx"></span><span><b>The catalyst:</b> a nameable reason — earnings inflection, product cycle, index inclusion, M&amp;A, sector supercycle. No catalyst, no trade.</span></li>
+    <li><span class="bx"></span><span><b>Relative strength:</b> beating the market over 3 months, and improving.</span></li>
+    <li><span class="bx"></span><span><b>Group confirmation:</b> peers moving too (refiners 2026, AI servers 2023–24, life-science tools now) marks a theme, not a fluke.</span></li>
+    <li><span class="bx"></span><span><b>The sizing:</b> enter in tranches, expect the 1-in-4 shakeout of −20%, give it up to 3 months.</span></li>
+  </ul>
+</section>
+
+<section id="watchlist">
+  <div class="kicker">05 · On the tape right now · as of 2026-09-18</div>
+  <h2>Stocks to be paying attention to</h2>
+  <p class="lede">Live output of the same scan. <b>Fresh fires</b> triggered the full ignition rule within the last month; <b>leaders</b> carry the strongest confirmed setups behind them.</p>
+
+  <h3 style="margin-top:26px">⚡ Fresh ignition fires</h3>
+  <div class="cards">
+    <div class="wcard fire">
+      <div class="fired">FIRED 2026-09-18</div>
+      <div class="whead"><span class="tick">ILMN</span><span class="wname">Illumina</span><span class="wsec">Genomics</span></div>
+      <div class="stats"><span class="stat">wk <b>+16%</b></span><span class="stat">vol <b>1.7×</b></span><span class="stat">3mo <b>+48%</b></span><span class="stat">52wk-hi <b>−2%</b></span></div>
+      <p class="why">Joins the <b>S&amp;P 500 on Sep 21</b> — forced index buying — at a fresh 52-week high. Core sequencing growth re-accelerating; +82% in six months with analyst targets still trailing price. The cleanest textbook fire on the list.</p>
+    </div>
+    <div class="wcard fire">
+      <div class="fired">FIRED 2026-09-17</div>
+      <div class="whead"><span class="tick">MRNA</span><span class="wname">Moderna</span><span class="wsec">Biotech</span></div>
+      <div class="stats"><span class="stat">wk <b>+16%</b></span><span class="stat">vol <b>3.0×</b></span><span class="stat">3mo <b>+141%</b></span><span class="stat">1yr <b>+416%</b></span></div>
+      <p class="why">Re-ignition on 3× volume after August's +156% month on positive <b>intismeran melanoma (cancer-vaccine) data</b>. Highest octane here: +439% YTD, analysts split (a rare Sell at $81 vs Wolfe upgrade). Post-catalyst continuation with violent drawdown risk — tranche it.</p>
+    </div>
+    <div class="wcard fire">
+      <div class="fired">FIRED 2026-09-08</div>
+      <div class="whead"><span class="tick">CNH</span><span class="wname">CNH Industrial</span><span class="wsec">Farm equipment</span></div>
+      <div class="stats"><span class="stat">wk <b>+15%</b></span><span class="stat">vol <b>1.5×</b></span><span class="stat">3mo <b>+29%</b></span><span class="stat">52wk-hi <b>−7%</b></span></div>
+      <p class="why">Evercore and Baird upgrades on a <b>2027 farm-cycle recovery</b>; +23% post-earnings week. A cheap cyclical turning up from a multi-year base with dealer inventories normalizing — the early-cycle profile most like Dell in Dec-2023.</p>
+    </div>
+  </div>
+
+  <h3 style="margin-top:34px">Confirmed leaders still in motion</h3>
+  <div class="tablewrap"><table>
+    <thead><tr><th>Stock</th><th class="num">3-mo</th><th class="num">vs mkt</th><th class="num">Vol</th><th>Why it's on the list</th></tr></thead>
+    <tbody>
+      <tr><td><span class="tick">ANF</span><div class="wsec">Abercrombie</div></td><td class="num gain">+56%</td><td class="num">+55%</td><td class="num">1.7×</td><td>Aug 26 earnings ignition: +35% in a day (EPS $4.17 vs $2.32, guidance raised, $100M tariff refund). Still digesting 11% below high — continuation odds stay elevated ~3 months post-fire.</td></tr>
+      <tr><td><span class="tick">SWKS</span><div class="wsec">Skyworks</div></td><td class="num gain">+23%</td><td class="num">+22%</td><td class="num">1.5×</td><td>+24% five-day rally as the $22B Qorvo merger enters its final regulatory phase. <b>36% short interest</b> = squeeze fuel. A hair under the volume threshold — a high-volume up day confirms.</td></tr>
+      <tr><td><span class="tick">VLO</span><div class="wsec">Valero</div></td><td class="num gain">+76%</td><td class="num">+75%</td><td class="num">1.0×</td><td rowspan="2">Refining supercycle: record crack spreads from a global fuel squeeze; the whole group (VLO, MPC, PSX, DINO) doubled YTD and sits at 52-week highs, RSI ~80. Strongest relative strength in the universe — but extended. Buy dips, don't chase strength here.</td></tr>
+      <tr><td><span class="tick">MPC</span><div class="wsec">Marathon Petroleum</div></td><td class="num gain">+75%</td><td class="num">+75%</td><td class="num">1.2×</td></tr>
+      <tr><td><span class="tick">RVTY</span><div class="wsec">Revvity</div></td><td class="num gain">+44%</td><td class="num">+43%</td><td class="num">1.4×</td><td>Life-science tools group move — ILMN, TMO, A, CRL, AVTR, BIO all screen strong simultaneously. Group breadth is the durable-theme tell; rotation into a two-year laggard group.</td></tr>
+      <tr><td><span class="tick">ROIV</span><div class="wsec">Roivant</div></td><td class="num gain">+27%</td><td class="num">+26%</td><td class="num">1.6×</td><td>+160% over 12 months on elevated volume near highs; biotech capital-rotation beneficiary alongside MRNA.</td></tr>
+    </tbody>
+  </table></div>
+  <p class="note">Sources for catalysts: Barron's, Reuters, WSJ, IBD, Yahoo Finance coverage, Sep 2026. Fund positioning shows up here as the volume ratio itself — a 1.5–3× sustained volume shift <i>is</i> institutional accumulation in the tape.</p>
+</section>
+
+<section id="track">
+  <div class="kicker">06 · Keep it running</div>
+  <h2>How to track this going forward</h2>
+  <p class="lede">The scan is three scripts in the repo (<code>momentum/pipeline</code> on branch <code>claude/stock-momentum-patterns-op28f6</code>). Re-run weekly — fires are rare (~4/week across 900 stocks) and stay actionable for weeks by design.</p>
+  <pre>pip install yfinance pandas numpy requests lxml
+export MOMENTUM_DATA=./data
+python pipeline/download_data.py   # refresh 11y of daily bars (~2 min)
+python pipeline/analyze.py         # episodes + backtest + today's screen
+python pipeline/recent_fires.py    # ⚡ the live watchlist feed</pre>
+  <p class="lede" style="margin-top:14px">Manual check between runs, for any stock: did it jump ≥12% this week? Is volume ≥1.5× normal? Is the 50-day above the 200-day? Is there a real catalyst? That's the whole signal — it fits on an index card.</p>
+</section>
+
+<p class="disclaimer">Research artifact, not investment advice. Backtests are hypothetical, exclude costs/slippage/survivorship nuances (universe = current index membership), and past patterns — however robust across 11 years — do not guarantee future results. The ignition signal's edge comes with materially elevated drawdown risk (23% chance of −20% within the window). Position sizing is the only free lunch here.</p>
+
+</div>
+<div class="tooltip" id="tt"></div>
+
+<script>
+(function(){
+  var yd = {
+    2016:[16.8,2.7],2017:[4.7,1.3],2018:[32.7,1.7],2019:[11.8,1.9],2020:[33.3,14.7],
+    2021:[18.3,3.2],2022:[10.9,3.6],2023:[20.9,4.2],2024:[30.1,3.6],2025:[40.3,6.6],2026:[24.1,6.5]
+  };
+  var counts = {2016:137,2017:129,2018:107,2019:68,2020:858,2021:191,2022:128,2023:134,2024:206,2025:196,2026:147};
+  var bars = document.getElementById('ybars'), labs = document.getElementById('ylabels');
+  var x = 58, gw = 71, bw = 26, scale = 3.5, base = 200;
+  var acc = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#E8501A';
+  var gry = getComputedStyle(document.documentElement).getPropertyValue('--faint').trim() || '#8B93A0';
+  Object.keys(yd).forEach(function(y,i){
+    var s = yd[y][0], b = yd[y][1], gx = x + i*gw;
+    var h1 = s*scale, h2 = b*scale;
+    bars.innerHTML += '<rect class="bar" data-tip="'+y+' · ignition '+s+'% ('+counts[y]+' fires)" x="'+gx+'" y="'+(base-h1)+'" width="'+bw+'" height="'+h1+'" rx="4" fill="'+acc+'"/>' +
+      '<rect class="bar" data-tip="'+y+' · baseline '+b+'%" x="'+(gx+bw+2)+'" y="'+(base-h2)+'" width="'+bw+'" height="'+h2+'" rx="4" fill="'+gry+'"/>';
+    labs.innerHTML += '<text x="'+(gx+bw+1)+'" y="220">'+("'"+String(y).slice(2))+'</text>';
+  });
+  var tt = document.getElementById('tt');
+  document.addEventListener('mousemove', function(e){
+    var g = e.target.closest ? e.target.closest('.bar,[data-tip]') : null;
+    var tip = g && (g.getAttribute('data-tip') || (g.parentNode.getAttribute && g.parentNode.getAttribute('data-tip')));
+    if (tip){ tt.textContent = tip; tt.style.opacity = 1;
+      var vw = window.innerWidth;
+      tt.style.left = Math.min(e.clientX + 14, vw - tt.offsetWidth - 10) + 'px';
+      tt.style.top = (e.clientY + 16) + 'px';
+    } else { tt.style.opacity = 0; }
+  });
+})();
+</script>
