@@ -1,0 +1,748 @@
+From b5d5b6f50e68ca2383b0e94478750c2376c89366 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Sat, 26 Sep 2026 15:43:15 +0000
+Subject: [PATCH] themes_web v1.5.0: Ignition Watch page + daily scan
+
+New standalone ignition/ module scans the S&P 500+400 (903 stocks)
+weekdays 17:00 ET for the momentum-ignition signal (+12% 5-day return on
+1.5x volume, 50-DMA > 200-DMA). Backtest 2016-2026: 26.9% of fires traded
++40% within 63 sessions vs 4.6% baseline, positive in 10 of 11 years.
+
+themes_web gains /ignition (fire log with NEW/+40% badges, near misses,
+RS leaders), GET /api/ignition, POST /api/refresh_ignition, a nav link,
+and scheduler jobs (weekday cron + boot scan when data is missing, since
+the Railway disk is wiped on redeploy). Runs by subprocess only, keeping
+the no-cross-import rule.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_0198hFgpZbH4xecuUPR2gcx6
+---
+ .gitignore                         |   3 +
+ CLAUDE.md                          |   1 +
+ ignition/README.md                 |  62 ++++++++
+ ignition/scan.py                   | 221 +++++++++++++++++++++++++++++
+ ignition/universe.txt              |   6 +
+ themes_web/RELEASES.md             |  32 ++++-
+ themes_web/app.py                  |  49 +++++++
+ themes_web/scheduler.py            |  38 +++++
+ themes_web/templates/base.html     |   3 +-
+ themes_web/templates/ignition.html | 170 ++++++++++++++++++++++
+ themes_web/version.py              |   2 +-
+ 11 files changed, 584 insertions(+), 3 deletions(-)
+ create mode 100644 ignition/README.md
+ create mode 100644 ignition/scan.py
+ create mode 100644 ignition/universe.txt
+ create mode 100644 themes_web/templates/ignition.html
+
+diff --git a/.gitignore b/.gitignore
+index ff8fd4c..e050179 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -18,3 +18,6 @@ ThemeHunter_*.html
+ notifier_preview.html
+ 
+ themes_web/_snapshots/
++
++# Ignition Watch runtime output (rebuilt by the scan; Railway disk is ephemeral)
++ignition/data/
+diff --git a/CLAUDE.md b/CLAUDE.md
+index 2dae2ec..16ff885 100644
+--- a/CLAUDE.md
++++ b/CLAUDE.md
+@@ -25,6 +25,7 @@ Human-owned, Claude-assisted long-term thesis investing. Run: `uvicorn themes_we
+ - Per theme: `thesis.md` → `supply_chain.md` → `candidates.md/json` → `scoring` → `tracker.json/md` (top ~5–7 holdings).
+ - Active themes: AI Data Center, Space Economy, Modern Defense, Robotics, GLP-1.
+ - `themes/refresh_data.py` refreshes prices/fundamentals nightly (FMP→yfinance) into `candidates.json` + shared `themes/_benchmarks.json`.
++- `/ignition` (v1.5.0): standalone `ignition/` module scans the S&P 500+400 weekdays 17:00 ET for the momentum-ignition signal (+12% week, 1.5× volume, 50>200 DMA); run by subprocess from `themes_web/scheduler.py`. Method + backtest: `ignition/README.md`.
+ 
+ ## Release hygiene — every push is a deploy
+ 
+diff --git a/ignition/README.md b/ignition/README.md
+new file mode 100644
+index 0000000..0fbff7b
+--- /dev/null
++++ b/ignition/README.md
+@@ -0,0 +1,62 @@
++# Ignition Watch
++
++Daily scan for the one pre-move pattern that survived an 11-year backtest of
++"Dell/Micron-style" explosive moves. Served by themes_web at `/ignition`.
++
++## The research (2015–2026, S&P 500 + 400, 903 tickers)
++
++- **628 episodes** of a stock gaining ≥ 80% within 63 trading days. About
++  half were crash rebounds (2020, late 2022); 327 were breakouts from a flat
++  base or an existing uptrend (Dell Dec-2023, Micron Apr-2025, PLTR, SMCI,
++  VST, GEV, CEG, AMD).
++- **The ideal entry is unknowable in real time.** The day before the best
++  entry, the median breakout stock was 29% off its high, below its 50-DMA,
++  RSI ≈ 38, with a negative 3-month return.
++- **The first violent week is catchable.** Most big runs broke cover with
++  a +12% week on heavy volume inside an uptrend.
++- **Quiet breakouts don't work.** A tight base breaking to a new high
++  *without* a volume shock had lower odds of +40% than the baseline
++  (2.9% vs 4.6%). Volume is the load-bearing ingredient.
++
++## The signal
++
++```
++IGNITION = 5-day return > +12%
++           AND 21-day avg volume > 1.5x its 126-day avg
++           AND 50-DMA > 200-DMA
++           (price > $3, 21-day avg dollar volume > $5M)
++```
++
++| Signal (2016–2026) | n | P(+40% in 63d) | P(+80%) | Mean 63d | P(−20% DD) |
++|---|---:|---:|---:|---:|---:|
++| **Ignition** | 2,271 | **26.9%** | **8.2%** | **+17.0%** | 22.7% |
++| Volume shock (2× vol, +10% month) | 2,681 | 21.3% | 8.2% | +8.9% | 29.1% |
++| 52w high + volume + RS | 34,297 | 10.3% | 2.4% | +6.6% | 17.1% |
++| RSI<35 dip in uptrend | 11,021 | 5.0% | 0.2% | +5.0% | 13.1% |
++| Baseline (any liquid day) | 2,178,204 | 4.6% | 0.6% | +4.5% | 11.7% |
++| Quiet tight breakout | 447,403 | 2.9% | 0.4% | +3.3% | 9.7% |
++
++Ignition beat the same-year baseline in 10 of 11 years (2017 was the
++exception). Caveats: no costs or slippage, and the universe is *current*
++index membership, so there is survivorship bias. Treat the edge as an upper
++bound.
++
++## Operation
++
++- `python ignition/scan.py` downloads ~2.5y of Yahoo daily bars for
++  `universe.txt` (~1–2 min) and writes `data/latest.json` plus
++  `data/history/<date>.json`.
++- themes_web runs it weekdays at **17:00 ET** and once at boot when
++  `latest.json` is missing, because Railway's disk is wiped on redeploy. You
++  can also trigger it with `POST /api/refresh_ignition`.
++- Fires are derived from price history, so the 90-session log rebuilds
++  itself after a redeploy. Only "first seen" and the NEW badge depend on the
++  previous `latest.json`. Without one, NEW means "fired in the last 3
++  sessions".
++- `universe.txt` is pinned (S&P 500 + 400 as of 2026-09-26). Refresh it when
++  index membership drifts.
++- Standalone module: it imports nothing from the scanner or themes, and
++  themes_web calls it only by subprocess.
++
++Research pipeline and full episode catalog:
++github.com/raveeshbhasin-git/Test1, branch `claude/stock-momentum-patterns-op28f6`, `momentum/`.
+diff --git a/ignition/scan.py b/ignition/scan.py
+new file mode 100644
+index 0000000..e70a503
+--- /dev/null
++++ b/ignition/scan.py
+@@ -0,0 +1,221 @@
++"""
++ignition/scan.py — daily Ignition Watch scan (standalone module).
++
++Scans the S&P 500 + 400 universe (universe.txt) for the IGNITION signal and
++writes ignition/data/latest.json for themes_web's /ignition page. Run as a
++subprocess by themes_web/scheduler.py (weekdays 17:00 ET) or by hand:
++
++    python ignition/scan.py
++
++Signal (backtest 2016-2026, 903 tickers, 2.18M ticker-days — see README.md):
++    IGNITION = 5-day return > +12%
++               AND 21-day avg volume > 1.5x its 126-day avg
++               AND 50-DMA > 200-DMA
++               (price > $3, 21-day avg dollar volume > $5M)
++    After a fire: 26.9% traded >= +40% above entry within 63 sessions vs
++    4.6% baseline; mean 63-session return +17.0% vs +4.5%; 22.7% saw a
++    -20% drawdown first vs 11.7% baseline.
++
++Fires are derived from price history, so the 90-session fire log rebuilds
++itself after a redeploy wipes the container. Only the "first seen" date and
++NEW badge use the previous latest.json, with a days-ago fallback when absent.
++"""
++from __future__ import annotations
++
++import json
++import sys
++from datetime import datetime, timedelta, timezone
++from pathlib import Path
++from zoneinfo import ZoneInfo
++
++import numpy as np
++import pandas as pd
++
++HERE = Path(__file__).parent
++DATA_DIR = HERE / "data"
++LATEST = DATA_DIR / "latest.json"
++HISTORY_DIR = DATA_DIR / "history"
++ET = ZoneInfo("America/New_York")
++
++LOOKBACK_SESSIONS = 90   # fires shown on the page
++NEW_FALLBACK_DAYS = 3    # NEW = fired within this many sessions when no prior scan exists
++BATCH = 150
++
++R5_MIN = 0.12
++VOLR_MIN = 1.5
++MIN_PRICE = 3.0
++MIN_DOLLAR_VOL = 5e6
++
++BACKTEST = {
++    "window": "2016-2026, S&P 500+400 (903 tickers), 2.18M ticker-days, 2,271 fires",
++    "p_plus40_63d": 26.9, "p_plus40_baseline": 4.6,
++    "p_plus80_63d": 8.2, "p_plus80_baseline": 0.6,
++    "mean_63d": 17.0, "mean_63d_baseline": 4.5,
++    "p_dd20_63d": 22.7, "p_dd20_baseline": 11.7,
++    "years_positive": "10 of 11",
++}
++
++
++def load_universe() -> list[str]:
++    tickers: set[str] = set()
++    for line in (HERE / "universe.txt").read_text(encoding="utf-8").splitlines():
++        if line.startswith("#"):
++            continue
++        tickers.update(t for t in line.split() if t)
++    return sorted(tickers)
++
++
++def download(tickers: list[str]) -> tuple[pd.DataFrame, pd.DataFrame]:
++    """~2.5 years of adjusted daily closes + volume (252d lookback + 200dma)."""
++    import yfinance as yf
++
++    start = (datetime.now(timezone.utc) - timedelta(days=920)).strftime("%Y-%m-%d")
++    closes, vols = [], []
++    for i in range(0, len(tickers), BATCH):
++        d = yf.download(tickers[i:i + BATCH], start=start, auto_adjust=True,
++                        progress=False, threads=True)
++        if d.empty:
++            continue
++        closes.append(d["Close"].astype("float32"))
++        vols.append(d["Volume"].astype("float32"))
++    if not closes:
++        raise RuntimeError("yfinance returned no data for any batch")
++    close = pd.concat(closes, axis=1)
++    vol = pd.concat(vols, axis=1)
++    close = close.loc[:, ~close.columns.duplicated()].sort_index()
++    vol = vol.loc[:, ~vol.columns.duplicated()].sort_index()
++    # Drop a trailing row that only a handful of tickers have (partial intraday bar).
++    if len(close) > 1 and close.iloc[-1].notna().mean() < 0.5:
++        close, vol = close.iloc[:-1], vol.iloc[:-1]
++    return close, vol
++
++
++def _pct(x: float) -> float | None:
++    return None if x is None or not np.isfinite(x) else round(float(x) * 100, 1)
++
++
++def compute(close: pd.DataFrame, vol: pd.DataFrame, prev: dict | None) -> dict:
++    r5 = close.pct_change(5, fill_method=None)
++    r63 = close.pct_change(63, fill_method=None)
++    r252 = close.pct_change(252, fill_method=None)
++    volr = vol.rolling(21).mean() / vol.rolling(126).mean()
++    golden = close.rolling(50).mean() > close.rolling(200).mean()
++    dollar_vol = (close * vol).rolling(21).mean()
++    hi252 = close.rolling(252).max()
++    rs63 = r63.sub(r63.mean(axis=1), axis=0)
++    valid = (close > MIN_PRICE) & (dollar_vol > MIN_DOLLAR_VOL) & r252.notna()
++    sig = (r5 > R5_MIN) & (volr > VOLR_MIN) & golden & valid
++
++    asof = close.index[-1]
++    scan_date = str(asof.date())
++    prev_first_seen: dict[str, str] = (prev or {}).get("first_seen", {})
++    prev_keys = set(prev_first_seen) if prev else None
++
++    # A halted or late-printing ticker can be missing today's bar; carry its
++    # last close so "now" columns stay numeric.
++    last_px = close.ffill(limit=5).iloc[-1]
++    last_r63 = close.ffill(limit=5).pct_change(63, fill_method=None).iloc[-1]
++    last_rs63 = last_r63 - last_r63.mean()
++
++    fires, first_seen = [], {}
++    recent = sig.iloc[-LOOKBACK_SESSIONS:]
++    n = len(close.index)
++    for t in recent.columns[recent.any().values]:
++        if not np.isfinite(last_px[t]):
++            continue
++        col = recent[t]
++        d0 = col[col].index[-1]
++        i = close.index.get_loc(d0)
++        key = f"{t}|{d0.date()}"
++        days_ago = n - 1 - i
++        is_new = (key not in prev_keys) if prev_keys is not None else days_ago < NEW_FALLBACK_DAYS
++        first_seen[key] = prev_first_seen.get(key, scan_date)
++        ret_since = last_px[t] / close[t].iloc[i] - 1
++        fires.append({
++            "ticker": t,
++            "fired": str(d0.date()),
++            "days_ago": int(days_ago),
++            "first_seen": first_seen[key],
++            "new": bool(is_new),
++            "r5_at_fire": _pct(r5[t].iloc[i]),
++            "volr_at_fire": round(float(volr[t].iloc[i]), 2),
++            "price_at_fire": round(float(close[t].iloc[i]), 2),
++            "price": round(float(last_px[t]), 2),
++            "ret_since": _pct(ret_since),
++            "r63": _pct(last_r63[t]) or 0.0,
++            "rs63": _pct(last_rs63[t]) or 0.0,
++            "pct_from_hi": _pct(last_px[t] / hi252[t].ffill().iloc[-1] - 1) or 0.0,
++            "hit_40": bool(close[t].iloc[i:].max() / close[t].iloc[i] - 1 >= 0.40),
++            "active": bool(days_ago <= 63),
++        })
++    fires.sort(key=lambda f: (f["fired"], f["r5_at_fire"] or 0), reverse=True)
++
++    last = pd.DataFrame({
++        "price": close.iloc[-1], "r63": r63.iloc[-1], "rs63": rs63.iloc[-1],
++        "volr": volr.iloc[-1], "pct_hi": close.iloc[-1] / hi252.iloc[-1] - 1,
++        "golden": golden.iloc[-1], "valid": valid.iloc[-1],
++    })
++    lead = last[last.valid & last.golden & (last.pct_hi > -0.15) & (last.rs63 > 0.15)]
++    lead = lead.sort_values("rs63", ascending=False).head(15)
++    leaders = [{
++        "ticker": t, "price": round(float(r.price), 2), "r63": _pct(r.r63),
++        "rs63": _pct(r.rs63), "volr": round(float(r.volr), 2), "pct_from_hi": _pct(r.pct_hi),
++    } for t, r in lead.iterrows()]
++
++    # Near misses: uptrend + heavy volume, weekly gain 8-12% — the watch-for-tomorrow list.
++    near = (r5.iloc[-1].between(0.08, R5_MIN)) & (volr.iloc[-1] > 1.3) & golden.iloc[-1] & valid.iloc[-1]
++    near_misses = sorted(({
++        "ticker": t, "r5": _pct(r5[t].iloc[-1]), "volr": round(float(volr[t].iloc[-1]), 2),
++        "price": round(float(close[t].iloc[-1]), 2),
++    } for t in near[near].index), key=lambda x: -(x["r5"] or 0))[:12]
++
++    active = [f for f in fires if f["active"]]
++    return {
++        "asof": scan_date,
++        "scanned_at": datetime.now(ET).strftime("%Y-%m-%d %H:%M ET"),
++        "universe": int(close.shape[1]),
++        "rule": {"r5_min": R5_MIN, "volr_min": VOLR_MIN, "min_price": MIN_PRICE,
++                 "min_dollar_vol": MIN_DOLLAR_VOL, "lookback_sessions": LOOKBACK_SESSIONS},
++        "backtest": BACKTEST,
++        "summary": {
++            "fires_logged": len(fires),
++            "active": len(active),
++            "new": [f["ticker"] for f in fires if f["new"]],
++            "active_hit_40": sum(f["hit_40"] for f in active),
++        },
++        "fires": fires,
++        "leaders": leaders,
++        "near_misses": near_misses,
++        "first_seen": first_seen,
++    }
++
++
++def main() -> int:
++    DATA_DIR.mkdir(parents=True, exist_ok=True)
++    HISTORY_DIR.mkdir(parents=True, exist_ok=True)
++    prev = None
++    if LATEST.exists():
++        try:
++            prev = json.loads(LATEST.read_text(encoding="utf-8"))
++        except Exception:
++            prev = None
++
++    tickers = load_universe()
++    close, vol = download(tickers)
++    result = compute(close, vol, prev)
++
++    tmp = LATEST.with_suffix(".tmp")
++    tmp.write_text(json.dumps(result, indent=1), encoding="utf-8")
++    tmp.replace(LATEST)
++    (HISTORY_DIR / f"{result['asof']}.json").write_text(
++        json.dumps({k: result[k] for k in ("asof", "scanned_at", "summary", "fires")}, indent=1),
++        encoding="utf-8")
++
++    s = result["summary"]
++    print(f"ignition scan asof={result['asof']} universe={result['universe']} "
++          f"fires={s['fires_logged']} active={s['active']} new={','.join(s['new']) or '-'}")
++    return 0
++
++
++if __name__ == "__main__":
++    sys.exit(main())
+diff --git a/ignition/universe.txt b/ignition/universe.txt
+new file mode 100644
+index 0000000..0ccb4b8
+--- /dev/null
++++ b/ignition/universe.txt
+@@ -0,0 +1,6 @@
++# S&P 500 + S&P 400 constituents (Wikipedia, 2026-09-26). Pinned so the scan
++# never depends on scraping at runtime; refresh when index membership drifts.
++# sp500
++A AAPL ABBV ABNB ABT ACGL ACN ADBE ADI ADM ADP ADSK AEE AEP AES AFL AIG AIZ AJG AKAM ALB ALGN ALL ALLE AMAT AMCR AMD AME AMGN AMP AMT AMZN ANET AON AOS APA APD APH APO APP APTV ARE ARES ATO AVGO AVY AWK AXON AXP AZO BA BAC BALL BAX BBY BDX BE BEN BF-B BG BIIB BKNG BKR BLK BMY BNY BR BRK-B BRO BSX BX BXP C CAH CARR CASY CAT CB CBOE CBRE CCI CCL CDNS CDW CEG CF CFG CHD CHRW CHTR CI CIEN CINF CL CLX CMCSA CME CMG CMI CMS CNC CNP COF COHR COIN COO COP COR COST CPAY CPRT CPT CRH CRL CRM CRWD CSCO CSGP CSX CTAS CTSH CTVA CVNA CVS CVX D DAL DASH DD DDOG DE DECK DELL DG DGX DHI DHR DIS DLR DLTR DOC DOV DOW DPZ DRI DTE DUK DVA DVN DXCM EBAY ECHO ECL ED EFX EG EIX EL ELV EME EMR EOG EQIX EQT ERIE ES ESS ETN ETR EVRG EW EXC EXE EXPD EXPE EXR F FANG FAST FCX FDS FDX FDXF FE FERG FFIV FICO FIS FISV FITB FIX FLEX FOX FOXA FRT FSLR FTNT FTV GD GDDY GE GEHC GEN GEV GILD GIS GL GLW GM GNRC GOOG GOOGL GPC GPN GRMN GS GWW HAL HAS HBAN HCA HD HIG HII HLT HON HONA HOOD HPE HPQ HRL HSIC HST HSY HUBB HUM HWM IBKR IBM ICE IDXX IEX IFF ILMN INCY INTC INTU INVH IP IQV IR IRM ISRG IT ITW IVZ J JBHT JBL JCI JKHY JNJ JPM KDP KEY KEYS KHC KIM KKR KLAC KMB KMI KO KR KVUE L LDOS LEN LH LHX LII LIN LITE LLY LMT LNT LOW LRCX LULU LUV LVS LYB LYV MA MAA MAR MAS MCD MCHP MCK MCO MDLZ MDT MET META MGM MKC MLM MMM MNST MO MOS MPC MPWR MRK MRNA MRSH MRVL MS MSCI MSFT MSI MTB MTD MU NCLH NDAQ NDSN NEE NEM NFLX NI NKE NOC NOW NRG NSC NTAP NTRS NUE NVDA NVR NWS NWSA NXPI O ODFL OKE OMC ON ORCL ORLY OTIS OXY P PANW PAYX PCAR PCG PEG PEP PFE PFG PG PGR PH PHM PKG PLD PLTR PM PNC PNR PNW PODD PPG PPL PRU PSA PSKY PSX PTC PWR PYPL Q QCOM RCL RDDT REG REGN RF RJF RL RMD ROK ROL ROP ROST RSG RTX RVTY SBAC SBUX SCHW SHW SJM SLB SMCI SNA SNDK SNPS SO SOLV SPG SPGI SRE STE STLD STT STX STZ SW SWK SWKS SYF SYK SYY T TDG TDY TECH TEL TER TFC TGT TJX TKO TMO TMUS TPL TPR TRGP TRMB TROW TRV TSCO TSLA TSN TT TTWO TXN TXT TYL UAL UBER UDR UHS ULTA UNH UNP UPS URI USB V VEEV VICI VLO VLTO VMC VMRK VRSK VRSN VRT VRTX VST VTR VTRS VZ WAB WAT WBD WDAY WDC WEC WELL WFC WM WMB WMT WRB WSM WST WTW WY WYNN XEL XOM XYL XYZ YUM ZBH ZBRA ZTS
++# sp400
++AA AAL AAON ACI ACM ADC AEIS AFG AGCO AGNC AHR AIT ALGM ALK ALLY ALSN ALV AM AMG AMH AMKR AN ANF APG APPF AR ARMK ARW ARWR ASB ASH ATI ATR AVAV AVNT AVT AVTR AXTA AYI BAH BBWI BC BCO BDC BHF BILL BIO BJ BKH BMRN BRKR BROS BRX BSY BTSG BURL BWA BWXT BYD CACI CAR CART CAVA CBSH CBT CCK CDE CDP CELH CFR CG CGNX CHDN CHE CHH CHRD CHWY CLF CLH CMC CNH CNM CNO CNX COKE COLB COLM CORT CR CRBG CROX CRS CRUS CSL CTRE CUBE CUZ CVLT CW CXT CYTK DAR DBX DCI DINO DKS DLB DOCN DOCS DOCU DT DTM DUOL DY EAT EEFT EGP EHC ELAN ELF ELS ENS ENSG ENTG EPR EQH ESAB ESNT EVR EWBC EXEL EXLS EXP EXPO FAF FBIN FCFS FCN FFIN FHI FHN FIVE FLG FLR FLS FN FNB FND FNF FOUR FR FTI G GAP GATX GBCI GEF GGG GHC GLPI GME GMED GNTX GPK GWRE GXO H HAE HALO HGV HIMS HL HLI HLNE HOG HOMB HQY HR HRB HUBS HWC HXL IBOC IDA IDCC IESC INGR IPGP IRT ITT JAZZ JEF JLL KBH KBR KD KEX KNF KNSL KNX KRC KRG KRYS KTOS LAD LAMR LEA LECO LFUS LIVN LNTH LOPE LPX LSCC LSTR M MANH MAT MEDP MIDD MKSI MLI MMS MOG-A MOH MORN MP MSA MSM MTDR MTG MTN MTSI MTZ MUR MUSA MZTI NBIX NEU NFG NJR NLY NNN NOV NOVT NTNX NVST NVT NWE NXST NXT NYT OC OGE OGS OHI OKTA OLED OLLI OLN ONB ONTO OPCH ORA ORI OSK OVV OZK PAG PATH PB PBF PCTY PEGA PEN PFGC PII PINS PK PLNT PNFP POR POST PPC PR PRI PSN PVH QLYS R RBA RBC REXR RGA RGEN RGLD RH RLI RMBS RNR ROIV ROKU RPM RRC RRX RS RYAN RYN SAIA SAIC SANM SARO SBRA SCI SEIC SF SFM SGI SHC SIGI SIRI SITM SLAB SLGN SLM SMG SMTC SN SNX SOLS SON SPXC SR SSB SSD ST STAG STRL STWD SUI SWX SYNA TCBI TEX THC THG THO TKR TLN TNL TOL TOST TREX TRU TTC TTEK TTMI TWLO TXNM TXRH UBSI UFPI UGI ULS UMBF UNM USFD UTHR VAL VC VFC VIAV VICR VLY VMI VNO VNOM VNT VOYA VVV WAL WCC WEX WFRD WH WHR WING WLK WMG WMS WPC WSO WTFC WTRG WTS WWD XPO XRAY YETI ZION
+diff --git a/themes_web/RELEASES.md b/themes_web/RELEASES.md
+index 4f40035..52af946 100644
+--- a/themes_web/RELEASES.md
++++ b/themes_web/RELEASES.md
+@@ -7,7 +7,37 @@ scanner's `config.APP_VERSION` + `logic.html` release-hygiene convention._
+ 
+ ---
+ 
+-## v1.4.0 — 2026-07-21 **(current)**
++## v1.5.0 — 2026-09-26 **(current)**
++
++**What** New `/ignition` page: Ignition Watch. A daily scan of the S&P 500
+++ 400 (903 stocks) for the momentum-ignition signal: a +12% week on 1.5×
++volume with the 50-DMA above the 200-DMA. The page shows a 90-session fire
++log with NEW and +40% badges, near misses, and RS leaders.
++- New standalone `ignition/` module (`scan.py`, pinned `universe.txt`,
++  README with the full backtest). Runs by subprocess only, which keeps the
++  no-cross-import rule.
++- Scheduler: new weekday 17:00 ET job, plus a one-off boot scan when
++  `ignition/data/latest.json` is missing (the disk is wiped on redeploy).
++  Manual trigger: `POST /api/refresh_ignition`. JSON: `GET /api/ignition`.
++- "Ignition" nav link next to "3X Screen".
++
++**Why** Operator research: find Dell/Micron-style explosive moves early.
++Across 628 episodes of +80% in 63 days (2015–2026), the one catchable tell
++was this ignition week. After a fire, 26.9% traded ≥ +40% within 63
++sessions vs 4.6% baseline, and the signal beat baseline in 10 of 11 years.
++The 3X Screen is a 2–3y thesis view; this is its weeks-scale counterpart.
++
++**Verified** `pytest` green. Full scan run end to end against live Yahoo
++data (903 tickers, ~1 min). TestClient checks: `/ignition` renders 200 with
++and without data, `/api/ignition` returns 404 then 200. Nav renders on
++existing pages. Scheduler registers the new jobs.
++
++**Rollback** Revert the commit. The new module and page are additive;
++existing pages and jobs are untouched.
++
++---
++
++## v1.4.0 — 2026-07-21
+ 
+ **What** `/referrals` app v2 — "Early indicators" lens for newer/pivoting
+ companies the 3y flywheel gate structurally excludes:
+diff --git a/themes_web/app.py b/themes_web/app.py
+index f6602fd..b7dbf82 100755
+--- a/themes_web/app.py
++++ b/themes_web/app.py
+@@ -14,6 +14,7 @@ the deployed scanner doesn't see it.
+ """
+ from __future__ import annotations
+ 
++import json
+ import logging
+ import sys
+ from datetime import datetime
+@@ -39,6 +40,7 @@ from themes_web.render import (
+     theme_dir,
+ )
+ from themes_web.scheduler import (
++    refresh_ignition,
+     refresh_referrals,
+     start_scheduler,
+     stop_scheduler,
+@@ -465,6 +467,53 @@ def api_refresh_referrals():
+         return JSONResponse({"ok": False, "error": str(e)}, status_code=500)
+ 
+ 
++_IGNITION_LATEST = _HERE.parent / "ignition" / "data" / "latest.json"
++
++
++def _load_ignition() -> Optional[dict]:
++    if not _IGNITION_LATEST.exists():
++        return None
++    try:
++        return json.loads(_IGNITION_LATEST.read_text(encoding="utf-8"))
++    except Exception:
++        logger.exception("Could not read ignition/data/latest.json")
++        return None
++
++
++@app.get("/ignition", response_class=HTMLResponse)
++def ignition_page(request: Request):
++    """Ignition Watch — daily scan of the S&P 500+400 for the backtested
++    momentum-ignition signal. Data comes from the standalone ignition/
++    module (weekdays 17:00 ET, or POST /api/refresh_ignition)."""
++    return templates.TemplateResponse(
++        request=request,
++        name="ignition.html",
++        context={
++            "active_slug": None,
++            "active_page": "ignition",
++            "tracker": None,
++            "all_themes": discover_themes_full(),
++            "ig": _load_ignition(),
++        },
++    )
++
++
++@app.get("/api/ignition", response_class=JSONResponse)
++def api_ignition():
++    ig = _load_ignition()
++    if ig is None:
++        return JSONResponse({"error": "No scan yet — POST /api/refresh_ignition"}, status_code=404)
++    ig.pop("first_seen", None)
++    return ig
++
++
++@app.post("/api/refresh_ignition", response_class=JSONResponse)
++def api_refresh_ignition():
++    """Manually rerun the Ignition Watch scan. Blocks ~1-2 min."""
++    result = refresh_ignition()
++    return {"ok": result.get("returncode") == 0, "result": result}
++
++
+ @app.post("/api/rescore/{slug}", response_class=JSONResponse)
+ def api_rescore(slug: str):
+     """
+diff --git a/themes_web/scheduler.py b/themes_web/scheduler.py
+index c877889..0ac5511 100755
+--- a/themes_web/scheduler.py
++++ b/themes_web/scheduler.py
+@@ -98,6 +98,27 @@ def refresh_referrals() -> dict:
+     return result
+ 
+ 
++_IGNITION_LATEST = _PROJECT_ROOT / "ignition" / "data" / "latest.json"
++
++
++def refresh_ignition() -> dict:
++    """
++    Rerun the Ignition Watch scan (ignition/ is a standalone module —
++    subprocess keeps the no-cross-import rule). ~1-2 min: downloads 2.5y of
++    daily bars for ~900 tickers. Also callable via POST /api/refresh_ignition.
++    """
++    logger.info("[scheduler] ignition scan starting")
++    try:
++        r = subprocess.run([_PYTHON, "ignition/scan.py"], cwd=_PROJECT_ROOT,
++                           capture_output=True, text=True, timeout=1200)
++        if r.returncode != 0:
++            logger.warning(f"[scheduler] ignition scan non-zero: {r.returncode}")
++        return {"returncode": r.returncode, "tail": (r.stdout + r.stderr)[-400:]}
++    except Exception as e:
++        logger.exception(f"[scheduler] ignition scan failed: {e}")
++        return {"error": str(e)}
++
++
+ def _scheduled_job():
+     """Cron entry point — refresh every active theme that has a tracker."""
+     # Discover active themes by scanning themes/ for tracker.json
+@@ -142,8 +163,25 @@ def start_scheduler() -> BackgroundScheduler:
+         replace_existing=True,
+         misfire_grace_time=6 * 3600,
+     )
++    # Ignition Watch: 17:00 ET weekdays — an hour after the close so Yahoo's
++    # daily bars are final, and before the 18:00 themes job.
++    _scheduler.add_job(
++        refresh_ignition,
++        trigger=CronTrigger(hour=17, minute=0, day_of_week="mon-fri",
++                            timezone="America/New_York"),
++        id="ignition_daily_scan",
++        name="Daily Ignition Watch scan",
++        replace_existing=True,
++        misfire_grace_time=3600,
++    )
++    # The container's disk is wiped on every deploy, so rebuild the page
++    # right away rather than leaving /ignition empty until 17:00.
++    if not _IGNITION_LATEST.exists():
++        _scheduler.add_job(refresh_ignition, id="ignition_boot_scan",
++                           name="Ignition Watch boot scan", replace_existing=True)
+     _scheduler.start()
+     logger.info("[scheduler] Started. Daily refresh 18:00 ET weekdays; "
++                "ignition scan 17:00 ET weekdays; "
+                 "referral refresh monthly (1st, 19:00 ET).")
+     return _scheduler
+ 
+diff --git a/themes_web/templates/base.html b/themes_web/templates/base.html
+index b4bfb76..39352ad 100755
+--- a/themes_web/templates/base.html
++++ b/themes_web/templates/base.html
+@@ -165,11 +165,12 @@
+       </div>
+       <a href="/portfolio" class="global-link {% if active_page == 'portfolio' %}active{% endif %}" style="font-size:13px; color:var(--text-secondary); text-decoration:none; padding-bottom:2px; border-bottom: 2px solid transparent;{% if active_page == 'portfolio' %} color:var(--text-primary); border-bottom-color:var(--accent); font-weight:500;{% endif %}">Portfolio</a>
+       <a href="/moonshots" class="global-link {% if active_page == 'moonshots' %}active{% endif %}" style="font-size:13px; color:var(--text-secondary); text-decoration:none; padding-bottom:2px; border-bottom: 2px solid transparent;{% if active_page == 'moonshots' %} color:var(--text-primary); border-bottom-color:var(--accent); font-weight:500;{% endif %}">3X Screen</a>
++      <a href="/ignition" class="global-link {% if active_page == 'ignition' %}active{% endif %}" style="font-size:13px; color:var(--text-secondary); text-decoration:none; padding-bottom:2px; border-bottom: 2px solid transparent;{% if active_page == 'ignition' %} color:var(--text-primary); border-bottom-color:var(--accent); font-weight:500;{% endif %}">Ignition</a>
+       <a href="/how-it-works" class="global-link {% if active_page == 'how-it-works' %}active{% endif %}" style="font-size:13px; color:var(--text-secondary); text-decoration:none; padding-bottom:2px; border-bottom: 2px solid transparent;{% if active_page == 'how-it-works' %} color:var(--text-primary); border-bottom-color:var(--accent); font-weight:500;{% endif %}">How it works</a>
+     </div>
+     <div class="theme-selector">
+       <label for="theme-switch">Theme</label>
+-      <select id="theme-switch" onchange="if(this.options[this.selectedIndex].disabled) return; location.href='/themes/'+this.value+'/{{ active_page if active_page and active_page not in ['how-it-works', 'portfolio', 'moonshots'] else 'tracker' }}'">
++      <select id="theme-switch" onchange="if(this.options[this.selectedIndex].disabled) return; location.href='/themes/'+this.value+'/{{ active_page if active_page and active_page not in ['how-it-works', 'portfolio', 'moonshots', 'ignition'] else 'tracker' }}'">
+         {% set active_themes = all_themes | selectattr('status', 'equalto', 'Active') | list %}
+         {% set ondeck_themes = all_themes | selectattr('status', 'equalto', 'On Deck') | list %}
+         {% set backlog_themes = all_themes | selectattr('status', 'equalto', 'Backlog') | list %}
+diff --git a/themes_web/templates/ignition.html b/themes_web/templates/ignition.html
+new file mode 100644
+index 0000000..0d8ecb5
+--- /dev/null
++++ b/themes_web/templates/ignition.html
+@@ -0,0 +1,170 @@
++{% extends "base.html" %}
++{% block title %}Ignition Watch · Themes{% endblock %}
++
++{% block extra_css %}
++  .pf-header { margin-bottom: 18px; }
++  .pf-title { font-family: var(--font-serif); font-size: 32px; line-height: 1.15; font-weight: 500; letter-spacing: -0.015em; margin: 0 0 4px; }
++  .pf-sub { font-size: 13px; color: var(--text-tertiary); max-width: 760px; line-height: 1.5; }
++
++  .method-strip { background: var(--bg-elev); border-radius: var(--radius-md); padding: 12px 18px; margin-bottom: 22px; font-size: 12.5px; color: var(--text-secondary); line-height: 1.55; }
++  .method-strip b { color: var(--text-primary); }
++
++  .status-row { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 18px; }
++  .chip { font-size: 11.5px; padding: 4px 10px; border-radius: 999px; background: var(--bg-elev); color: var(--text-secondary); font-variant-numeric: tabular-nums; }
++  .chip b { color: var(--text-primary); font-weight: 500; }
++  .chip.new { background: var(--text-warning-bg); color: var(--text-warning); }
++  .chip.new b { color: var(--text-warning); }
++
++  .kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 26px; }
++  .kpi { background: var(--bg-elev); border-radius: var(--radius-md); padding: 14px 18px; }
++  .kpi-label { font-size: 11px; color: var(--text-secondary); margin-bottom: 4px; font-weight: 500; letter-spacing: 0.04em; text-transform: uppercase; }
++  .kpi-value { font-size: 24px; font-weight: 500; font-variant-numeric: tabular-nums; letter-spacing: -0.01em; }
++  .kpi-value .unit { font-size: 13px; color: var(--text-secondary); margin-left: 4px; font-weight: 400; }
++  .kpi-sub { font-size: 11px; color: var(--text-tertiary); margin-top: 3px; }
++
++  .section-head { font-size: 11px; color: var(--text-secondary); font-weight: 500; letter-spacing: 0.06em; text-transform: uppercase; margin: 28px 0 12px; display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
++  .section-head .hint { text-transform: none; letter-spacing: 0; font-weight: 400; color: var(--text-tertiary); }
++
++  .tbl-wrap { overflow-x: auto; background: var(--bg-surface); border: 0.5px solid var(--border); border-radius: var(--radius-md); }
++  table.ig { width: 100%; border-collapse: collapse; font-size: 13px; font-variant-numeric: tabular-nums; }
++  table.ig th { font-size: 10.5px; font-weight: 500; letter-spacing: 0.05em; text-transform: uppercase; color: var(--text-tertiary); text-align: right; padding: 10px 12px; border-bottom: 0.5px solid var(--border); white-space: nowrap; }
++  table.ig th:first-child, table.ig td:first-child, table.ig th.l, table.ig td.l { text-align: left; }
++  table.ig td { text-align: right; padding: 9px 12px; border-top: 0.5px solid var(--border); white-space: nowrap; }
++  table.ig tr:first-child td { border-top: none; }
++  table.ig tr.faded td { color: var(--text-tertiary); }
++  .tk { font-family: var(--font-mono); font-weight: 600; }
++  .pos { color: var(--text-success); } .neg { color: var(--text-danger); }
++  .badge { font-size: 10px; padding: 2px 6px; border-radius: 4px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; margin-left: 6px; vertical-align: 1px; }
++  .badge.new { background: var(--text-warning-bg); color: var(--text-warning); }
++  .badge.hit { background: var(--text-success-bg); color: var(--text-success); }
++
++  .empty { padding: 28px; text-align: center; color: var(--text-secondary); font-size: 13px; }
++  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
++  .footnote { font-size: 11.5px; color: var(--text-tertiary); line-height: 1.6; }
++
++  @media (max-width: 900px) {
++    .kpis { grid-template-columns: repeat(2, 1fr); }
++    .two-col { grid-template-columns: 1fr; }
++  }
++{% endblock %}
++
++{% block content %}
++<div class="pf-header">
++  <h1 class="pf-title">Ignition Watch</h1>
++  <div class="pf-sub">
++    Explosive moves (Dell 2023, Micron 2025) rarely announce themselves quietly — the discoverable start is a
++    <b>violent week on heavy volume inside an intact uptrend</b>. This page rescans the S&amp;P 500 + 400 every
++    weekday after the close and logs every stock that fires.
++  </div>
++</div>
++
++{% if ig %}
++{% set b = ig.backtest %}
++{% set s = ig.summary %}
++<div class="method-strip">
++  <b>Rule:</b> 5-day return &gt; +{{ (ig.rule.r5_min * 100)|round|int }}% · 21-day volume &gt; {{ ig.rule.volr_min }}× its 126-day
++  average · 50-DMA &gt; 200-DMA · price &gt; $3, $5M+ daily dollar volume.
++  <b>Backtest</b> ({{ b.window }}): {{ b.p_plus40_63d }}% of fires traded ≥ +40% above entry within 63 sessions
++  vs {{ b.p_plus40_baseline }}% baseline; mean 63-session return +{{ b.mean_63d }}% vs +{{ b.mean_63d_baseline }}%;
++  edge positive in {{ b.years_positive }} years. <b>Cost:</b> {{ b.p_dd20_63d }}% saw a −20% drawdown within the
++  window (vs {{ b.p_dd20_baseline }}%). A fire is a prompt to find the catalyst, not a buy signal on its own.
++</div>
++
++<div class="status-row">
++  <span class="chip">data through <b>{{ ig.asof }}</b></span>
++  <span class="chip">scanned <b>{{ ig.scanned_at }}</b></span>
++  <span class="chip">next scan <b>weekdays 17:00 ET</b></span>
++  <span class="chip"><b>{{ ig.universe }}</b> stocks</span>
++  {% if s.new %}<span class="chip new">new this scan: <b>{{ s.new|join(', ') }}</b></span>{% endif %}
++</div>
++
++<div class="kpis">
++  <div class="kpi">
++    <div class="kpi-label">Active fires</div>
++    <div class="kpi-value">{{ s.active }}</div>
++    <div class="kpi-sub">fired within the 63-session edge window</div>
++  </div>
++  <div class="kpi">
++    <div class="kpi-label">New this scan</div>
++    <div class="kpi-value">{{ s.new|length }}</div>
++    <div class="kpi-sub">{{ s.new|join(', ') if s.new else 'none since last scan' }}</div>
++  </div>
++  <div class="kpi">
++    <div class="kpi-label">Active fires hit +40%</div>
++    <div class="kpi-value">{{ s.active_hit_40 }}<span class="unit">of {{ s.active }}</span></div>
++    <div class="kpi-sub">backtest expects ~{{ b.p_plus40_63d|round|int }}% by session 63</div>
++  </div>
++  <div class="kpi">
++    <div class="kpi-label">Logged</div>
++    <div class="kpi-value">{{ s.fires_logged }}</div>
++    <div class="kpi-sub">fires in the last {{ ig.rule.lookback_sessions }} sessions</div>
++  </div>
++</div>
++
++<div class="section-head">Fire log <span class="hint">most recent fire per stock · faded rows are past the 63-session window</span></div>
++{% if ig.fires %}
++<div class="tbl-wrap"><table class="ig">
++  <thead><tr>
++    <th>Stock</th><th class="l">Fired</th><th>Sessions ago</th><th>Week at fire</th><th>Vol at fire</th>
++    <th>Since fire</th><th>3-mo</th><th>vs universe</th><th>Off 52w high</th><th>Price</th>
++  </tr></thead>
++  <tbody>
++  {% for f in ig.fires %}
++    <tr class="{{ '' if f.active else 'faded' }}">
++      <td><span class="tk">{{ f.ticker }}</span>{% if f.new %}<span class="badge new">New</span>{% endif %}{% if f.hit_40 %}<span class="badge hit" title="Traded ≥ +40% above the fire-day close">+40%</span>{% endif %}</td>
++      <td class="l">{{ f.fired }}</td>
++      <td>{{ f.days_ago }}</td>
++      <td class="pos">+{{ f.r5_at_fire }}%</td>
++      <td>{{ f.volr_at_fire }}×</td>
++      <td class="{{ 'pos' if f.ret_since >= 0 else 'neg' }}">{{ '%+.1f'|format(f.ret_since) }}%</td>
++      <td class="{{ 'pos' if f.r63 >= 0 else 'neg' }}">{{ '%+.1f'|format(f.r63) }}%</td>
++      <td>{{ '%+.1f'|format(f.rs63) }}%</td>
++      <td>{{ '%.1f'|format(f.pct_from_hi) }}%</td>
++      <td>${{ '%.2f'|format(f.price) }}</td>
++    </tr>
++  {% endfor %}
++  </tbody>
++</table></div>
++{% else %}
++<div class="tbl-wrap"><div class="empty">No fires in the last {{ ig.rule.lookback_sessions }} sessions — rare, but it happens in quiet tapes.</div></div>
++{% endif %}
++
++<div class="two-col">
++  <div>
++    <div class="section-head">Near misses <span class="hint">+8–12% week on 1.3×+ volume, uptrend intact</span></div>
++    {% if ig.near_misses %}
++    <div class="tbl-wrap"><table class="ig">
++      <thead><tr><th>Stock</th><th>5-day</th><th>Vol ratio</th><th>Price</th></tr></thead>
++      <tbody>{% for n in ig.near_misses %}
++        <tr><td><span class="tk">{{ n.ticker }}</span></td><td class="pos">+{{ n.r5 }}%</td><td>{{ n.volr }}×</td><td>${{ '%.2f'|format(n.price) }}</td></tr>
++      {% endfor %}</tbody>
++    </table></div>
++    {% else %}<div class="tbl-wrap"><div class="empty">None today.</div></div>{% endif %}
++  </div>
++  <div>
++    <div class="section-head">RS leaders <span class="hint">context, not fires: strongest 3-mo vs universe, within 15% of highs</span></div>
++    {% if ig.leaders %}
++    <div class="tbl-wrap"><table class="ig">
++      <thead><tr><th>Stock</th><th>3-mo</th><th>vs universe</th><th>Off high</th></tr></thead>
++      <tbody>{% for l in ig.leaders %}
++        <tr><td><span class="tk">{{ l.ticker }}</span></td><td class="pos">+{{ l.r63 }}%</td><td>+{{ l.rs63 }}%</td><td>{{ '%.1f'|format(l.pct_from_hi) }}%</td></tr>
++      {% endfor %}</tbody>
++    </table></div>
++    {% else %}<div class="tbl-wrap"><div class="empty">None today.</div></div>{% endif %}
++  </div>
++</div>
++
++{% else %}
++<div class="tbl-wrap"><div class="empty">
++  First scan is running (about 2 minutes after a deploy). Refresh shortly — or trigger one with
++  <code>POST /api/refresh_ignition</code>.
++</div></div>
++{% endif %}
++
++<div class="footnote" style="margin-top:22px;">
++  Source: <code>ignition/scan.py</code> → <code>ignition/data/latest.json</code> (Yahoo daily bars, dividend-adjusted;
++  universe pinned in <code>ignition/universe.txt</code>). Method + full backtest: <code>ignition/README.md</code>.
++  JSON: <a href="/api/ignition">/api/ignition</a>. Backtest excludes costs and uses current index membership
++  (survivorship) — treat the edge as an upper bound.
++</div>
++{% endblock %}
+diff --git a/themes_web/version.py b/themes_web/version.py
+index 7b48d4c..90e380e 100644
+--- a/themes_web/version.py
++++ b/themes_web/version.py
+@@ -11,4 +11,4 @@ Convention (mirrors the scanner's config.APP_VERSION + templates/logic.html):
+   always visible and always matches this constant. No hand-copied strings.
+ """
+ 
+-THEMES_WEB_VERSION = "1.4.0"
++THEMES_WEB_VERSION = "1.5.0"
+-- 
+2.43.0
+
